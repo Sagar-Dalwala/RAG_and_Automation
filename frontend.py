@@ -1,140 +1,130 @@
-# step 1: setup ui with streamlit (model_name, model_provider, system_prompt, messages, allow_search)
 import streamlit as st
 import requests
+from auth_db import init_db, create_user, verify_user, save_chat_history, get_user_chat_history
 
-st.set_page_config(page_title="Langchain AI Agent", page_icon="🤖", layout="centered")
-st.title("AI Agent - Chatbot")
-st.write("Create and Interact with AI Chatbot using LangGraph and Search Tools.")
+# Initialize the database
+init_db()
 
-# system_prompt = st.text_area("System Prompt", "Act as an AI chatbot who is smart and friendly. You can search the web for information. You can also answer questions and have conversations with users.")
-system_prompt = st.text_area(
-    "Define your Ai Agent:", height=100, placeholder="Type your system prompt here..."
-)
+# Initialize session state
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
 
-MODEL_NAME_GROQ = [
-    "llama-3.3-70b-versatile",
-    "llama-70b-8192",
-    "mixtral-8x7b-32768",
-    "qwen-qwq-32b",
-    "deepseek-r1-distill-llama-70b",
-]
-MODEL_NAME_OPENAI = ["gpt-4o-mini"]
+st.set_page_config(page_title="Langchain AI Agent", page_icon="🤖", layout="wide")
 
-provider = st.radio("Select AI Model Provider", ["Groq", "OpenAI"])
+# Sidebar for authentication and chat history
+with st.sidebar:
+    if st.session_state.user_id is None:
+        st.title("Login / Sign Up")
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        
+        with tab1:
+            login_username = st.text_input("Username", key="login_username")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            if st.button("Login"):
+                if login_username and login_password:
+                    user_id = verify_user(login_username, login_password)
+                    if user_id:
+                        st.session_state.user_id = user_id
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password")
+                else:
+                    st.warning("Please enter both username and password")
+        
+        with tab2:
+            new_username = st.text_input("Username", key="new_username")
+            new_password = st.text_input("Password", type="password", key="new_password")
+            if st.button("Sign Up"):
+                if new_username and new_password:
+                    if create_user(new_username, new_password):
+                        st.success("Account created successfully! Please login.")
+                    else:
+                        st.error("Username already exists")
+                else:
+                    st.warning("Please enter both username and password")
+    else:
+        st.title("Chat History")
+        if st.button("Logout"):
+            st.session_state.user_id = None
+            st.rerun()
+        
+        # Display chat history
+        history = get_user_chat_history(st.session_state.user_id)
+        for query, response, model_name, model_provider, timestamp in history:
+            with st.expander(f"Chat at {timestamp}"):
+                st.write(f"**Model:** {model_provider} - {model_name}")
+                st.write(f"**You:** {query}")
+                st.write(f"**AI:** {response}")
 
-if provider == "Groq":
-    model_name = st.selectbox("Select Groq Model", MODEL_NAME_GROQ)
-else:
-    model_name = st.selectbox("Select OpenAI Model", MODEL_NAME_OPENAI)
+# Main chat interface (only shown when logged in)
+if st.session_state.user_id is not None:
+    st.title("AI Agent - Chatbot")
+    st.write("Create and Interact with AI Chatbot using LangGraph and Search Tools.")
 
-allow_web_search = st.checkbox("Allow Web Search")
+    system_prompt = st.text_area(
+        "Define your AI Agent:", height=100, placeholder="Type your system prompt here..."
+    )
 
-user_query = st.text_area("Enter Your Query", height=150, placeholder="Ask Anything...")
+    MODEL_NAME_GROQ = [
+        "llama-3.3-70b-versatile",
+        "llama-70b-8192",
+        "mixtral-8x7b-32768",
+        "qwen-qwq-32b",
+        "deepseek-r1-distill-llama-70b",
+    ]
+    MODEL_NAME_OPENAI = ["gpt-4o-mini"]
 
-API_URL = "http://127.0.0.1:8000/chat"
+    provider = st.radio("Select AI Model Provider", ["Groq", "OpenAI"])
 
-if st.button("Ask Agent"):
-    if user_query.strip():
-        # step 2: connect with backend api (chat_endpoint)
-        payload = {
-            "model_name": model_name,
-            "model_provider": provider,
-            "system_prompt": system_prompt,
-            "messages": [user_query],
-            "allow_search": allow_web_search,
-        }
+    if provider == "Groq":
+        model_name = st.selectbox("Select Groq Model", MODEL_NAME_GROQ)
+    else:
+        model_name = st.selectbox("Select OpenAI Model", MODEL_NAME_OPENAI)
 
-        response = requests.post(API_URL, json=payload)
+    allow_web_search = st.checkbox("Allow Web Search")
 
-        if response.status_code == 200:
-            response_data = response.json()
+    user_query = st.text_area("Enter Your Query", height=150, placeholder="Ask Anything...")
 
-            if "error" in response_data:
-                st.error(response_data["error"])
-            else:
-                st.subheader("Agent Response")
-                st.markdown(f"**Final Response:** {response_data}")
+    API_URL = "http://127.0.0.1:8000/chat"
 
+    if st.button("Ask Agent"):
+        if user_query.strip():
+            with st.spinner("AI Agent is thinking..."):
+                payload = {
+                    "model_name": model_name,
+                    "model_provider": provider,
+                    "system_prompt": system_prompt,
+                    "messages": [user_query],
+                    "allow_search": allow_web_search,
+                }
 
-# import streamlit as st
-# import requests
-# import os
-
-# st.set_page_config(page_title="Langchain AI Agent", page_icon="🤖", layout="centered")
-# st.title("AI Agent - Chatbot")
-# st.write("Create and Interact with AI Chatbot using LangGraph and Search Tools.")
-
-# # system_prompt area
-# system_prompt = st.text_area(
-#     "Define your AI Agent:", 
-#     height=100, 
-#     placeholder="Type your system prompt here..."
-# )
-
-# # Model selection
-# MODEL_NAME_GROQ = [
-#     "llama-3.3-70b-versatile",
-#     "llama-70b-8192",
-#     "mixtral-8x7b-32768",
-#     "qwen-qwq-32b",
-#     "deepseek-r1-distill-llama-70b",
-# ]
-# MODEL_NAME_OPENAI = ["gpt-4o-mini"]
-
-# provider = st.radio("Select AI Model Provider", ["Groq", "OpenAI"])
-
-# if provider == "Groq":
-#     model_name = st.selectbox("Select Groq Model", MODEL_NAME_GROQ)
-#     if st.checkbox("Allow Web Search"):
-#         st.warning("Note: Web search is currently only fully supported with OpenAI models. When using Groq models, the agent will rely on its built-in knowledge.")
-#         allow_web_search = False
-#     else:
-#         allow_web_search = False
-# else:
-#     model_name = st.selectbox("Select OpenAI Model", MODEL_NAME_OPENAI)
-#     allow_web_search = st.checkbox("Allow Web Search")
-
-# user_query = st.text_area("Enter Your Query", height=150, placeholder="Ask Anything...")
-
-# API_URL = "http://127.0.0.1:8000/chat"
-
-# # Check API keys
-# if provider == "Groq" and not os.environ.get("GROQ_API_KEY"):
-#     st.warning("GROQ_API_KEY environment variable is not set. Please set it before making requests.")
-
-# if provider == "OpenAI" and not os.environ.get("OPENAI_API_KEY"):
-#     st.warning("OPENAI_API_KEY environment variable is not set. Please set it before making requests.")
-
-# if allow_web_search and not os.environ.get("TAVILY_API_KEY"):
-#     st.warning("TAVILY_API_KEY environment variable is not set. Web search functionality may not work.")
-
-# if st.button("Ask Agent"):
-#     if user_query.strip():
-#         with st.spinner("AI Agent is thinking..."):
-#             # step 2: connect with backend api (chat_endpoint)
-#             payload = {
-#                 "model_name": model_name,
-#                 "model_provider": provider,
-#                 "system_prompt": system_prompt,
-#                 "messages": [user_query],
-#                 "allow_search": allow_web_search,
-#             }
-
-#             try:
-#                 response = requests.post(API_URL, json=payload)
-                
-#                 if response.status_code == 200:
-#                     response_data = response.json()
+                try:
+                    response = requests.post(API_URL, json=payload)
                     
-#                     if isinstance(response_data, dict) and "error" in response_data:
-#                         st.error(response_data["error"])
-#                     else:
-#                         st.subheader("Agent Response")
-#                         st.markdown(response_data)
-#                 else:
-#                     st.error(f"Error: Received status code {response.status_code} from server.")
-#                     st.code(response.text)
-#             except requests.exceptions.ConnectionError:
-#                 st.error("Could not connect to the backend server. Make sure it's running at http://127.0.0.1:8000")
-#     else:
-#         st.warning("Please enter a query first!")
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        
+                        if isinstance(response_data, dict) and "error" in response_data:
+                            st.error(response_data["error"])
+                        else:
+                            st.subheader("Agent Response")
+                            st.markdown(response_data)
+                            
+                            # Save to chat history
+                            save_chat_history(
+                                st.session_state.user_id,
+                                user_query,
+                                response_data,
+                                model_name,
+                                provider
+                            )
+                    else:
+                        st.error(f"Error: Received status code {response.status_code} from server.")
+                        st.code(response.text)
+                except requests.exceptions.ConnectionError:
+                    st.error("Could not connect to the backend server. Make sure it's running at http://127.0.0.1:8000")
+        else:
+            st.warning("Please enter a query first!")
+else:
+    st.info("Please login or sign up to start chatting with the AI Agent.")
