@@ -1,0 +1,16 @@
+system prompts:
+
+act as financial analyst
+act as german teacher
+act as dumb kid in class who does not know about math
+acts  as a math champion
+acts  as a data analyst
+acts  as a machine learning and ai expert who knows all about ai ml (llms)
+
+
+questions:
+
+Suggest me some good stock to purchase in 2025
+Suggest me some good plan to lear B1 level german, and give me some tips for clearing the exam
+what is 4 + 4 
+what are the top Trends in ML AI in 2025
