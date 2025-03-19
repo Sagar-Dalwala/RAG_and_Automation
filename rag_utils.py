@@ -1,10 +1,10 @@
-import streamlit as st
 import faiss
 import os
 from io import BytesIO
 from docx import Document
 import numpy as np
 from langchain_community.document_loaders import WebBaseLoader
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 from PyPDF2 import PdfReader
 from langchain.chains import RetrievalQA
 from langchain.text_splitter import CharacterTextSplitter
@@ -14,9 +14,17 @@ from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_huggingface import HuggingFaceEndpoint
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
+# Get API key from environment variables
 huggingface_api_key = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+
+# Store document metadata for source attribution and visualization
+document_metadata = {}
+
+# Store session history for analytics and export
+qa_history = []
 
 def process_input(input_type, input_data):
     """Processes different input types and returns a vectorstore."""
@@ -92,39 +100,9 @@ def process_input(input_type, input_data):
 
 def answer_question(vectorstore, query):
     """Answers a question based on the provided vectorstore."""
-    llm = HuggingFaceEndpoint(repo_id= 'meta-llama/Meta-Llama-3-8B-Instruct', 
+    llm = HuggingFaceEndpoint(repo_id= 'Qwen/QwQ-32B', 
                               token = huggingface_api_key, temperature= 0.6)
     qa = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
 
     answer = qa({"query": query})
     return answer
-
-def main():
-    st.title("RAG Q&A App")
-    input_type = st.selectbox("Input Type", ["Link", "PDF", "Text", "DOCX", "TXT"])
-    if input_type == "Link":
-        number_input = st.number_input(min_value=1, max_value=20, step=1, label = "Enter the number of Links")
-        input_data = []
-        for i in range(number_input):
-            url = st.sidebar.text_input(f"URL {i+1}")
-            input_data.append(url)
-    elif input_type == "Text":
-        input_data = st.text_input("Enter the text")
-    elif input_type == 'PDF':
-        input_data = st.file_uploader("Upload a PDF file", type=["pdf"])
-    elif input_type == 'TXT':
-        input_data = st.file_uploader("Upload a text file", type=['txt'])
-    elif input_type == 'DOCX':
-        input_data = st.file_uploader("Upload a DOCX file", type=[ 'docx', 'doc'])
-    if st.button("Proceed"):
-        # st.write(process_input(input_type, input_data))
-        vectorstore = process_input(input_type, input_data)
-        st.session_state["vectorstore"] = vectorstore
-    if "vectorstore" in st.session_state:
-        query = st.text_input("Ask your question")
-        if st.button("Submit"):
-            answer = answer_question(st.session_state["vectorstore"], query)
-            st.write(answer)
-
-if __name__ == "__main__":
-    main()
