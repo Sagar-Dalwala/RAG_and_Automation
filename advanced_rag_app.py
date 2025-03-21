@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 import base64
+import requests
 from io import BytesIO, StringIO
 from streamlit_option_menu import option_menu
 from rag_utils import (
@@ -114,8 +115,8 @@ def main():
     # Navigation menu
     selected = option_menu(
         menu_title=None,
-        options=["Input", "Q&A", "Visualization", "Analytics", "Export"],
-        icons=["cloud-upload", "chat-dots", "graph-up", "bar-chart", "download"],
+        options=["Input", "Q&A", "Visualization", "Analytics", "AI Code Review", "Export"],
+        icons=["cloud-upload", "chat-dots", "graph-up", "bar-chart", "code-slash", "download"],
         menu_icon="cast",
         default_index=0,
         orientation="horizontal",
@@ -626,3 +627,101 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    # AI Code Review Tab
+    if selected == "AI Code Review":
+        st.markdown('<h2 class="sub-header">AI Code Review</h2>', unsafe_allow_html=True)
+        
+        with st.container():
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            
+            # Code input and language selection
+            code_input = st.text_area("Enter your code", height=300)
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                language = st.selectbox("Select Language", ["Python", "JavaScript", "Java", "C++", "Ruby", "Go"])
+            
+            with col2:
+                task_type = st.selectbox(
+                    "Analysis Type",
+                    ["Code Analysis", "Code Generation", "Code Optimization", "Bug Finding"]
+                )
+            
+            if st.button("Analyze Code", type="primary"):
+                if code_input.strip():
+                    with st.spinner("Analyzing code..."):
+                        try:
+                            # Create request object
+                            request = {
+                                "code": code_input,
+                                "task_type": task_type,
+                                "language": language
+                            }
+                            
+                            # Call code assistant API
+                            response = requests.post(
+                                "http://127.0.0.1:8001/code-assistant",
+                                json=request
+                            )
+                            
+                            if response.status_code == 200:
+                                analysis_result = response.json()
+                                
+                                # Display results in an expandable section
+                                with st.expander("Analysis Results", expanded=True):
+                                    st.markdown("### Analysis Summary")
+                                    st.markdown(analysis_result)
+                                    
+                                    # Add copy button for the analysis
+                                    st.markdown(
+                                        f"<button onclick=\"navigator.clipboard.writeText('{analysis_result}')\">Copy Analysis</button>",
+                                        unsafe_allow_html=True
+                                    )
+                            else:
+                                st.error(f"Error analyzing code: {response.text}")
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
+                else:
+                    st.warning("Please enter some code to analyze.")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Display example code templates
+            with st.expander("Example Code Templates"):
+                st.markdown("### Example Code Templates")
+                st.markdown("""
+                Select a template to get started:
+                
+                **Python Example:**
+                ```python
+                def calculate_factorial(n):
+                    if n < 0:
+                        return None
+                    if n == 0:
+                        return 1
+                    return n * calculate_factorial(n - 1)
+                ```
+                
+                **JavaScript Example:**
+                ```javascript
+                function calculateFactorial(n) {
+                    if (n < 0) return null;
+                    if (n === 0) return 1;
+                    return n * calculateFactorial(n - 1);
+                }
+                ```
+                """)
+            
+            # Add tips and best practices
+            with st.expander("Tips & Best Practices"):
+                st.markdown("### Tips for Better Code Review")
+                st.markdown("""
+                1. **Clean Code**: Ensure your code is properly formatted before submission
+                2. **Complete Functions**: Include complete function definitions
+                3. **Context**: Add comments to explain complex logic
+                4. **Scope**: Focus on specific functions or classes for better analysis
+                5. **Language**: Make sure to select the correct programming language
+                """)
+            
+            st.markdown('</div>', unsafe_allow_html=True)

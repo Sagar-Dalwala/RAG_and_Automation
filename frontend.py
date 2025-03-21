@@ -121,7 +121,7 @@ if st.session_state.user_id is not None:
     else:
 
         # Create tabs for different functionalities
-        tab1, tab2 = st.tabs(["AI Agent Chat", "RAG Document Q&A"])
+        tab1, tab2, tab3, tab4 = st.tabs(["AI Agent Chat", "RAG Document Q&A", "Code Assistant", "Web Automation"])
 
         with tab1:
             # Regular chat interface
@@ -279,5 +279,153 @@ if st.session_state.user_id is not None:
                         st.warning("Please enter a question first!")
                         
                 # Removed the duplicate Clear Document button since we now have it above
+        with tab3:
+            # Code Assistant interface
+            st.title("Code Assistant")
+            st.write("Get help with code analysis, generation, and best practices.")
+            
+            code_input = st.text_area(
+                "Enter your code or describe what you want to create:",
+                height=200,
+                placeholder="Paste your code here or describe the code you want to generate..."
+            )
+            
+            task_type = st.radio(
+                "Select Task Type",
+                ["Code Analysis", "Code Generation", "Code Optimization", "Bug Finding"]
+            )
+            
+            programming_language = st.selectbox(
+                "Select Programming Language",
+                ["Python", "JavaScript", "Java", "C++", "Go", "Rust", "Other"]
+            )
+            
+            if st.button("Process Code"):
+                if code_input.strip():
+                    with st.spinner("Processing code..."):
+                        try:
+                            # Prepare the payload for the code assistant API
+                            payload = {
+                                "code": code_input,
+                                "task_type": task_type,
+                                "language": programming_language
+                            }
+                            
+                            # Call the code assistant API (to be implemented)
+                            response = requests.post("http://127.0.0.1:8000/code-assistant", json=payload)
+                            
+                            if response.status_code == 200:
+                                response_data = response.json()
+                                
+                                if isinstance(response_data, dict) and "error" in response_data:
+                                    st.error(response_data["error"])
+                                else:
+                                    st.subheader("Assistant Response")
+                                    st.markdown(response_data)
+                                    
+                                    # Save to chat history with special model name
+                                    save_chat_history(
+                                        st.session_state.user_id,
+                                        code_input,
+                                        response_data,
+                                        "Code-Assistant",
+                                        "CodeLLM"
+                                    )
+                            else:
+                                st.error(f"Error: Received status code {response.status_code} from server.")
+                                st.code(response.text)
+                        except requests.exceptions.ConnectionError:
+                            st.error("Could not connect to the backend server. Make sure it's running at http://127.0.0.1:8000")
+                else:
+                    st.warning("Please enter some code or description first!")
+                        
+                # Removed the duplicate Clear Document button since we now have it above
+        
+        with tab4:
+            # Web Automation interface
+            st.title("Web Automation")
+            st.write("Browse and extract content from web pages using automated browser.")
+            
+            # Initialize web automation in session state if not present
+            if 'web_automation' not in st.session_state:
+                from web_automation import WebAutomation
+                st.session_state.web_automation = WebAutomation()
+            
+            # URL input
+            url = st.text_input("Enter URL to browse", placeholder="https://example.com")
+            
+            col1, col2, col3 = st.columns([1, 1, 1])
+            
+            with col1:
+                if st.button("Browse"):
+                    if url:
+                        with st.spinner("Loading page..."):
+                            result = st.session_state.web_automation.navigate_to_url(url)
+                            if "error" in result:
+                                st.error(f"Error: {result['error']}")
+                            else:
+                                st.success("Page loaded successfully!")
+                                
+                                # Extract and display content
+                                content = st.session_state.web_automation.extract_page_content()
+                                if "error" not in content:
+                                    st.subheader("Page Content")
+                                    st.write(f"Title: {content['title']}")
+                                    st.write(f"Description: {content['description']}")
+                                    
+                                    with st.expander("View Full Content"):
+                                        st.markdown(content['content'])
+                                        
+                                    with st.expander("View Links"):
+                                        for link in content['links']:
+                                            st.markdown(f"[{link['text']}]({link['href']})")
+                                else:
+                                    st.error(f"Error extracting content: {content['error']}")
+                    else:
+                        st.warning("Please enter a URL first!")
+            
+            with col2:
+                if st.button("Take Screenshot"):
+                    if url:
+                        with st.spinner("Taking screenshot..."):
+                            screenshot = st.session_state.web_automation.take_screenshot("page.png")
+                            if "error" not in screenshot:
+                                st.image("page.png", caption="Page Screenshot")
+                            else:
+                                st.error(f"Error taking screenshot: {screenshot['error']}")
+                    else:
+                        st.warning("Please browse a page first!")
+            
+            with col3:
+                if st.button("Close Browser"):
+                    st.session_state.web_automation.close_browser()
+                    st.success("Browser closed successfully!")
+            
+            # Search functionality
+            st.subheader("Search in Page")
+            search_query = st.text_input("Enter search term")
+            if st.button("Search"):
+                if search_query:
+                    results = st.session_state.web_automation.search_in_page(search_query)
+                    if "error" not in results:
+                        st.write(f"Found {len(results['results'])} matches:")
+                        for result in results['results']:
+                            st.markdown(f"**Match:** {result['content']}")
+                            st.markdown(f"**Context:** {result['context']}")
+                            st.markdown("---")
+                    else:
+                        st.error(f"Error searching: {results['error']}")
+                else:
+                    st.warning("Please enter a search term!")
+            
+            # Page navigation
+            st.subheader("Page Navigation")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Scroll Down"):
+                    st.session_state.web_automation.scroll_page("down")
+            with col2:
+                if st.button("Scroll Up"):
+                    st.session_state.web_automation.scroll_page("up")
 else:
     st.info("Please login or sign up to start chatting with the AI Agent.")
