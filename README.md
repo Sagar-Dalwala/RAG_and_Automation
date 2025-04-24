@@ -1,78 +1,109 @@
-# Beyond Chatbots - AI Agents with Real-Time Web Search & LLMs
+# Advanced RAG Application with Hierarchical Chat History
 
-## Overview
-This project provides an AI Agent that interacts with users through a chatbot interface. It leverages Large Language Models (LLMs) such as LLaMA and GPT-4o, along with real-time web search capabilities. The application is built using FastAPI for the backend and Streamlit for the frontend, enabling dynamic AI interactions with a user-friendly interface.
+This application demonstrates an advanced implementation of Retrieval-Augmented Generation (RAG) with hierarchical chat history, allowing users to branch conversations and maintain context across related discussions.
 
 ## Features
-- **AI Chatbot**: Interact with an AI chatbot powered by LangGraph.
-- **Multiple AI Models**: Supports different LLMs like LLaMA, Mixtral, DeepSeek, and GPT-4o.
-- **Real-Time Web Search**: Option to enable web search for more informed responses.
-- **User-Friendly Interface**: Built with Streamlit for easy interaction.
-- **REST API Support**: A FastAPI-based backend with a `/chat` endpoint for AI interactions.
 
-## Tech Stack
-- **Backend**: FastAPI
-- **Frontend**: Streamlit
-- **AI Models**: OpenAI, Groq (LLaMA, Mixtral, DeepSeek)
-- **API Documentation**: Swagger UI (provided by FastAPI)
+- Authentication with JWT tokens and cookie-based sessions
+- Hierarchical chat history with parent-child relationships
+- Support for multiple AI models from Groq and OpenAI
+- Document processing and RAG integration
+- Modern React frontend with Chakra UI
+- FastAPI backend with SQLite database
 
-## Installation & Setup
-### Prerequisites
-Ensure you have Python installed (version 3.8+ recommended).
+## Project Structure
 
-### Clone the Repository
-```sh
- git clone <repository-url>
- cd <repository-folder>
+The project is divided into two main parts:
+
+### Backend (FastAPI)
+
+- `api/` - FastAPI application modules
+  - `auth.py` - Authentication with JWT tokens
+  - `chat_history.py` - Hierarchical chat history
+  - `rag.py` - Document processing and RAG
+  - `ai_agent.py` - AI model integration
+  - `main.py` - Main application entry point
+
+### Frontend (React)
+
+- `frontend/` - React application
+  - `src/components/` - Reusable UI components
+  - `src/context/` - React context for state management
+  - `src/pages/` - Page components
+  - `src/utils/` - Utility functions
+
+## Setup
+
+### Environment Setup
+
+1. Create a `.env` file in the root directory with the following variables:
+
+```
+GROQ_API_KEY=your_groq_api_key
+OPENAI_API_KEY=your_openai_api_key
+HUGGINGFACEHUB_API_TOKEN=your_huggingface_token
+SECRET_KEY=your_secret_key
+API_HOST=127.0.0.1
+API_PORT=8000
+REACT_APP_API_URL=http://127.0.0.1:8000
 ```
 
-### Install Dependencies
-```sh
- pip install -r requirements.txt
+### Backend Setup
+
+1. Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
 
-### Run the Backend
-```sh
- uvicorn main:app --reload
-```
-- The FastAPI server will start at `http://127.0.0.1:8000`
-- Visit `http://127.0.0.1:8000/docs` for API documentation.
+2. Run the FastAPI server:
 
-### Run the Frontend
-```sh
- streamlit run app.py
+```bash
+python run_api.py
 ```
+
+The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000) with documentation at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+
+```bash
+cd frontend
+```
+
+2. Install Node.js dependencies:
+
+```bash
+npm install
+```
+
+3. Start the development server:
+
+```bash
+npm start
+```
+
+The frontend will be available at [http://localhost:3000](http://localhost:3000).
 
 ## Usage
-### 1. Using the API
-- **GET `/`**: Returns a welcome message.
-- **POST `/chat`**: Accepts a JSON payload to interact with the AI agent.
 
-Example Request:
-```json
-{
-    "model_name": "gpt-4o-mini",
-    "model_provider": "OpenAI",
-    "system_prompt": "Act as an AI assistant.",
-    "messages": ["Hello, how can you help me?"],
-    "allow_search": true
-}
-```
+1. Register a new account or log in
+2. Create a new chat session
+3. Upload documents in the Documents section
+4. Start chatting with the AI using the selected model
+5. Branch conversations to explore different paths
+6. Use RAG to query your documents
 
-### 2. Using the UI
-- Open the Streamlit app.
-- Enter a system prompt to define the agent’s behavior.
-- Select an AI model provider and model.
-- Enter a query and interact with the AI agent.
+## Technologies Used
 
-## Future Enhancements
-- Implement caching for responses.
-- Expand support for more AI models.
-- Optimize API response time.
+- **Backend**: FastAPI, SQLite, LangChain, FAISS
+- **Frontend**: React, Chakra UI, React Router, React Query
+- **Authentication**: JWT tokens, HTTP-only cookies
+- **AI**: Groq and OpenAI models
+- **Vector Database**: FAISS for document embeddings
 
 ## License
-This project is open-source under the MIT License.
 
-## Contributors
-Feel free to contribute by submitting issues or pull requests!
+MIT
 

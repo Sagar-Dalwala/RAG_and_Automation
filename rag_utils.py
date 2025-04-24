@@ -8,7 +8,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from PyPDF2 import PdfReader
 from langchain.chains import RetrievalQA
 from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_huggingface import HuggingFaceEndpoint
@@ -79,30 +79,31 @@ def process_input(input_type, input_data):
     model_kwargs = {'device': 'cpu'}
     encode_kwargs = {'normalize_embeddings': False}
 
+    # Use the updated HuggingFaceEmbeddings from langchain_huggingface
     hf_embeddings = HuggingFaceEmbeddings(
         model_name=model_name,
         model_kwargs=model_kwargs,
         encode_kwargs=encode_kwargs
     )
-    # Create FAISS index
-    sample_embedding = np.array(hf_embeddings.embed_query("sample text"))
-    dimension = sample_embedding.shape[0]
-    index = faiss.IndexFlatL2(dimension)
+    
     # Create FAISS vector store with the embedding function
-    vector_store = FAISS(
-        embedding_function=hf_embeddings.embed_query,
-        index=index,
-        docstore=InMemoryDocstore(),
-        index_to_docstore_id={},
+    vector_store = FAISS.from_texts(
+        texts=texts,
+        embedding=hf_embeddings
     )
-    vector_store.add_texts(texts)  # Add documents to the vector store
+    
     return vector_store
 
 def answer_question(vectorstore, query):
     """Answers a question based on the provided vectorstore."""
-    llm = HuggingFaceEndpoint(repo_id= 'Qwen/QwQ-32B', 
-                              token = huggingface_api_key, temperature= 0.6)
+    llm = HuggingFaceEndpoint(
+        repo_id='Qwen/QwQ-32B', 
+        huggingfacehub_api_token=huggingface_api_key,
+        temperature=0.6
+    )
+    
     qa = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
-
-    answer = qa({"query": query})
+    
+    # Use the invoke method instead of __call__
+    answer = qa.invoke({"query": query})
     return answer

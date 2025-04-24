@@ -3,6 +3,8 @@ import requests
 from auth_db import init_db, create_user, verify_user, save_chat_history, get_user_chat_history
 from rag_utils import process_input, answer_question
 from session_manager import init_session, login_user, logout_user
+import pandas as pd
+import json
 
 # Set page config first before any other st commands
 st.set_page_config(page_title="Langchain AI Agent", page_icon="🤖", layout="wide")
@@ -342,90 +344,387 @@ if st.session_state.user_id is not None:
                 # Removed the duplicate Clear Document button since we now have it above
         
         with tab4:
-            # Web Automation interface
-            st.title("Web Automation")
-            st.write("Browse and extract content from web pages using automated browser.")
+            # Web Automation interface with advanced features
+            st.title("Advanced Web Scraping & Analysis")
+            st.write("Extract, analyze, and visualize content from websites with our advanced web scraping tools.")
             
             # Initialize web automation in session state if not present
             if 'web_automation' not in st.session_state:
-                from web_automation import WebAutomation
-                st.session_state.web_automation = WebAutomation()
+                from ai_web_automation import AdvancedWebScraper
+                st.session_state.web_automation = AdvancedWebScraper()
             
-            # URL input
-            url = st.text_input("Enter URL to browse", placeholder="https://example.com")
+            # Create tabs for different web automation features
+            automation_tab1, automation_tab2, automation_tab3, automation_tab4 = st.tabs([
+                "Basic Scraping", "Content Analysis", "Site Crawler", "Data Extraction"
+            ])
             
-            col1, col2, col3 = st.columns([1, 1, 1])
-            
-            with col1:
-                if st.button("Browse"):
-                    if url:
-                        with st.spinner("Loading page..."):
-                            result = st.session_state.web_automation.navigate_to_url(url)
-                            if "error" in result:
-                                st.error(f"Error: {result['error']}")
-                            else:
-                                st.success("Page loaded successfully!")
-                                
-                                # Extract and display content
-                                content = st.session_state.web_automation.extract_page_content()
-                                if "error" not in content:
-                                    st.subheader("Page Content")
-                                    st.write(f"Title: {content['title']}")
-                                    st.write(f"Description: {content['description']}")
-                                    
-                                    with st.expander("View Full Content"):
-                                        st.markdown(content['content'])
-                                        
-                                    with st.expander("View Links"):
-                                        for link in content['links']:
-                                            st.markdown(f"[{link['text']}]({link['href']})")
+            with automation_tab1:
+                # URL input
+                url = st.text_input("Enter URL to browse", 
+                                   placeholder="https://example.com",
+                                   key="basic_url")
+                
+                col1, col2, col3 = st.columns([1, 1, 1])
+                
+                with col1:
+                    if st.button("Load Page"):
+                        if url:
+                            with st.spinner("Loading page..."):
+                                result = st.session_state.web_automation.navigate_to_url(url)
+                                if "error" in result:
+                                    st.error(f"Error: {result['error']}")
                                 else:
-                                    st.error(f"Error extracting content: {content['error']}")
-                    else:
-                        st.warning("Please enter a URL first!")
-            
-            with col2:
-                if st.button("Take Screenshot"):
-                    if url:
-                        with st.spinner("Taking screenshot..."):
-                            screenshot = st.session_state.web_automation.take_screenshot("page.png")
-                            if "error" not in screenshot:
-                                st.image("page.png", caption="Page Screenshot")
+                                    st.success("Page loaded successfully!")
+                                    st.subheader("Page Metrics")
+                                    metrics = result.get("metrics", {})
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Load Time", f"{metrics.get('load_time_seconds', 0)} sec")
+                                    with col2:
+                                        st.metric("Page Size", f"{metrics.get('page_size_bytes', 0) // 1024} KB")
+                                    
+                                    # Extract and display content
+                                    with st.spinner("Extracting content..."):
+                                        content = st.session_state.web_automation.extract_page_content()
+                                        if "error" not in content:
+                                            st.subheader("Page Content")
+                                            st.write(f"Title: {content['title']}")
+                                            
+                                            # Display meta tags
+                                            with st.expander("Meta Information"):
+                                                if 'meta_tags' in content and content['meta_tags']:
+                                                    for name, value in content['meta_tags'].items():
+                                                        st.text(f"{name}: {value}")
+                                                else:
+                                                    st.text("No meta tags found")
+                                            
+                                            # Display main content
+                                            with st.expander("Main Content"):
+                                                st.markdown(content['main_content'][:1000] + 
+                                                         ("..." if len(content['main_content']) > 1000 else ""))
+                                            
+                                            # Display links
+                                            with st.expander(f"Links ({content['links_count']})"):
+                                                for i, link in enumerate(content['links'][:20]):
+                                                    st.markdown(f"[{link['text'] or link['href']}]({link['href']})")
+                                                if content['links_count'] > 20:
+                                                    st.write(f"... and {content['links_count'] - 20} more links")
+                                            
+                                            # Display images
+                                            with st.expander(f"Images ({content['images_count']})"):
+                                                image_grid = st.columns(3)
+                                                for i, img in enumerate(content['images'][:9]):
+                                                    with image_grid[i % 3]:
+                                                        if img['src'].startswith(('http://', 'https://')):
+                                                            st.image(img['src'], width=150, 
+                                                                   caption=img['alt'] or "Image")
+                                                            st.text(f"Source: {img['src'][:30]}...")
+                                        else:
+                                            st.error(f"Error extracting content: {content['error']}")
+                        else:
+                            st.warning("Please enter a URL first!")
+                
+                with col2:
+                    if st.button("Take Screenshot"):
+                        if st.session_state.web_automation.current_url:
+                            with st.spinner("Taking screenshot..."):
+                                screenshot = st.session_state.web_automation.take_screenshot(full_page=True)
+                                if "error" not in screenshot:
+                                    st.image(screenshot["image_data"])
+                                else:
+                                    st.error(f"Error taking screenshot: {screenshot['error']}")
+                        else:
+                            st.warning("Please browse a page first!")
+                
+                with col3:
+                    if st.button("Close Browser"):
+                        close_result = st.session_state.web_automation.close_browser()
+                        st.success(close_result.get("message", "Browser closed successfully!"))
+                
+                # Search functionality with improved display
+                st.subheader("Search in Page")
+                search_query = st.text_input("Enter search term", key="basic_search")
+                context_size = st.slider("Context Size (words)", min_value=10, max_value=100, value=30)
+                
+                if st.button("Search Content"):
+                    if search_query:
+                        with st.spinner("Searching..."):
+                            results = st.session_state.web_automation.search_in_page(search_query, context_size)
+                            if "error" not in results:
+                                st.write(f"Found {results['occurrences']} matches:")
+                                
+                                for i, result in enumerate(results['results'][:10]):
+                                    with st.container():
+                                        st.markdown(f"**Match {i+1}:** {result.get('match', '')}")
+                                        context = result.get('context', '')
+                                        # Highlight the match in the context
+                                        highlighted_context = context.replace(
+                                            result.get('match', ''), 
+                                            f"**{result.get('match', '')}**"
+                                        )
+                                        st.markdown(f"**Context:** {highlighted_context}")
+                                        st.markdown("---")
+                                
+                                if results['occurrences'] > 10:
+                                    st.info(f"Showing 10 of {results['occurrences']} matches. Refine your search for more specific results.")
                             else:
-                                st.error(f"Error taking screenshot: {screenshot['error']}")
+                                st.error(f"Error searching: {results['error']}")
                     else:
-                        st.warning("Please browse a page first!")
+                        st.warning("Please enter a search term!")
             
-            with col3:
-                if st.button("Close Browser"):
-                    st.session_state.web_automation.close_browser()
-                    st.success("Browser closed successfully!")
-            
-            # Search functionality
-            st.subheader("Search in Page")
-            search_query = st.text_input("Enter search term")
-            if st.button("Search"):
-                if search_query:
-                    results = st.session_state.web_automation.search_in_page(search_query)
-                    if "error" not in results:
-                        st.write(f"Found {len(results['results'])} matches:")
-                        for result in results['results']:
-                            st.markdown(f"**Match:** {result['content']}")
-                            st.markdown(f"**Context:** {result['context']}")
-                            st.markdown("---")
+            with automation_tab2:
+                st.subheader("Content Analysis")
+                
+                if st.button("Analyze Current Page"):
+                    if st.session_state.web_automation.current_url:
+                        with st.spinner("Analyzing page content..."):
+                            analysis_result = st.session_state.web_automation.analyze_content()
+                            
+                            if "error" not in analysis_result:
+                                analysis = analysis_result.get("analysis", {})
+                                
+                                # Display basic metrics
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Word Count", analysis.get("word_count", 0))
+                                with col2:
+                                    link_analysis = analysis.get("link_analysis", {})
+                                    st.metric("Total Links", link_analysis.get("total_links", 0))
+                                with col3:
+                                    st.metric("Internal/External", 
+                                            f"{link_analysis.get('internal_links', 0)}/{link_analysis.get('external_links', 0)}")
+                                
+                                # Word frequency visualization
+                                st.subheader("Word Frequency Analysis")
+                                visualizations = analysis.get("visualizations", {})
+                                if "word_frequency" in visualizations:
+                                    st.image(visualizations["word_frequency"])
+                                
+                                # Display most common words
+                                if "most_common_words" in analysis:
+                                    st.subheader("Most Common Words")
+                                    
+                                    # Create a table of the most common words
+                                    word_data = analysis["most_common_words"]
+                                    df = pd.DataFrame(word_data, columns=["Word", "Count"])
+                                    st.dataframe(df)
+                                
+                                # Link distribution visualization
+                                st.subheader("Link Distribution")
+                                if "link_distribution" in visualizations:
+                                    st.image(visualizations["link_distribution"])
+                            else:
+                                st.error(f"Error analyzing content: {analysis_result['error']}")
                     else:
-                        st.error(f"Error searching: {results['error']}")
-                else:
-                    st.warning("Please enter a search term!")
+                        st.warning("Please load a page first!")
+                
+                # Extract structured data
+                st.subheader("Extract Structured Data")
+                if st.button("Extract Metadata & Structured Data"):
+                    if st.session_state.web_automation.current_url:
+                        with st.spinner("Extracting structured data..."):
+                            content = st.session_state.web_automation.extract_page_content()
+                            if "error" not in content and "structured_data" in content:
+                                structured_data = content["structured_data"]
+                                
+                                # Display JSON-LD data
+                                if structured_data.get("json_ld"):
+                                    with st.expander("JSON-LD Data"):
+                                        for i, data in enumerate(structured_data["json_ld"]):
+                                            st.json(data)
+                                
+                                # Display OpenGraph data
+                                if structured_data.get("opengraph"):
+                                    with st.expander("OpenGraph Data"):
+                                        for prop, content in structured_data["opengraph"].items():
+                                            st.text(f"{prop}: {content}")
+                                
+                                # Display Twitter Card data
+                                if structured_data.get("twitter_cards"):
+                                    with st.expander("Twitter Card Data"):
+                                        for name, content in structured_data["twitter_cards"].items():
+                                            st.text(f"{name}: {content}")
+                            else:
+                                st.info("No structured data found or page not loaded")
+                    else:
+                        st.warning("Please load a page first!")
+                
+                # Extract contact information
+                st.subheader("Contact Information Extraction")
+                if st.button("Extract Contact Info"):
+                    if st.session_state.web_automation.current_url:
+                        with st.spinner("Extracting contact information..."):
+                            contact_info = st.session_state.web_automation.extract_contact_info()
+                            if "error" not in contact_info:
+                                # Display emails
+                                if contact_info.get("emails"):
+                                    st.subheader("Emails")
+                                    for email in contact_info["emails"]:
+                                        st.text(email)
+                                else:
+                                    st.info("No emails found")
+                                    
+                                # Display phones
+                                if contact_info.get("phones"):
+                                    st.subheader("Phone Numbers")
+                                    for phone in contact_info["phones"]:
+                                        st.text(phone)
+                                else:
+                                    st.info("No phone numbers found")
+                                    
+                                # Display addresses
+                                if contact_info.get("addresses"):
+                                    st.subheader("Addresses")
+                                    for address in contact_info["addresses"]:
+                                        st.text(address)
+                                else:
+                                    st.info("No addresses found")
+                                    
+                                # Display social media
+                                if contact_info.get("social_media"):
+                                    st.subheader("Social Media")
+                                    for social in contact_info["social_media"]:
+                                        st.markdown(f"[{social['platform']}]({social['url']})")
+                                else:
+                                    st.info("No social media links found")
+                            else:
+                                st.error(f"Error extracting contact info: {contact_info['error']}")
+                    else:
+                        st.warning("Please load a page first!")
             
-            # Page navigation
-            st.subheader("Page Navigation")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Scroll Down"):
-                    st.session_state.web_automation.scroll_page("down")
-            with col2:
-                if st.button("Scroll Up"):
-                    st.session_state.web_automation.scroll_page("up")
+            with automation_tab3:
+                st.subheader("Website Crawler")
+                st.write("Crawl multiple pages of a website and analyze the structure")
+                
+                crawl_url = st.text_input("Enter Starting URL", placeholder="https://example.com", key="crawl_url")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    max_pages = st.slider("Maximum Pages", min_value=2, max_value=50, value=10)
+                    crawl_depth = st.slider("Crawl Depth", min_value=1, max_value=5, value=2)
+                with col2:
+                    stay_on_domain = st.checkbox("Stay on Same Domain", value=True)
+                
+                if st.button("Start Crawling"):
+                    if crawl_url:
+                        with st.spinner(f"Crawling website starting from {crawl_url}..."):
+                            crawl_results = st.session_state.web_automation.crawl_site(
+                                crawl_url, 
+                                max_pages=max_pages,
+                                stay_on_domain=stay_on_domain,
+                                depth=crawl_depth
+                            )
+                            
+                            if "error" not in crawl_results:
+                                results = crawl_results.get("crawl_results", {})
+                                
+                                # Display crawl statistics
+                                st.subheader("Crawl Statistics")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Pages Visited", results.get("pages_visited", 0))
+                                with col2:
+                                    st.metric("URLs Found", results.get("urls_found", 0))
+                                with col3:
+                                    st.metric("Errors", len(results.get("errors", [])))
+                                
+                                # Display site structure graph
+                                if "site_graph" in results:
+                                    st.subheader("Site Structure")
+                                    st.image(results["site_graph"])
+                                
+                                # Display crawled pages
+                                st.subheader("Crawled Pages")
+                                for url, data in results.get("data", {}).items():
+                                    with st.expander(f"{data.get('title', url)}"):
+                                        st.markdown(f"**URL:** {url}")
+                                        st.markdown(f"**Links:** {data.get('links_count', 0)}")
+                                        st.markdown(f"**Images:** {data.get('images_count', 0)}")
+                                
+                                # Display errors
+                                if results.get("errors"):
+                                    with st.expander("Crawl Errors"):
+                                        for error in results["errors"]:
+                                            st.markdown(f"**URL:** {error.get('url')}")
+                                            st.markdown(f"**Error:** {error.get('error')}")
+                            else:
+                                st.error(f"Error during crawl: {crawl_results['error']}")
+                    else:
+                        st.warning("Please enter a starting URL!")
+            
+            with automation_tab4:
+                st.subheader("Custom Data Extraction")
+                st.write("Extract specific content using CSS selectors")
+                
+                extract_url = st.text_input("Enter URL", placeholder="https://example.com", key="extract_url")
+                
+                # CSS selector input
+                css_selector = st.text_input(
+                    "Enter CSS Selector", 
+                    placeholder="article .content, #main-content, .product-card",
+                    help="Examples: 'h1' (all h1 headers), '.product' (elements with 'product' class), '#main' (element with 'main' id)"
+                )
+                
+                # Common selector templates
+                st.write("Common selector templates:")
+                selector_cols = st.columns(4)
+                with selector_cols[0]:
+                    if st.button("Main Content"):
+                        css_selector = "main, #content, .content, article"
+                with selector_cols[1]:
+                    if st.button("Headlines"):
+                        css_selector = "h1, h2, h3"
+                with selector_cols[2]:
+                    if st.button("All Links"):
+                        css_selector = "a[href]"
+                with selector_cols[3]:
+                    if st.button("All Images"):
+                        css_selector = "img[src]"
+                
+                if st.button("Extract Data"):
+                    if extract_url and css_selector:
+                        # Navigate to URL if it's different from current
+                        if st.session_state.web_automation.current_url != extract_url:
+                            with st.spinner(f"Loading {extract_url}..."):
+                                result = st.session_state.web_automation.navigate_to_url(extract_url)
+                                if "error" in result:
+                                    st.error(f"Error loading page: {result['error']}")
+                                    st.stop()
+                        
+                        # Extract data using selector
+                        with st.spinner(f"Extracting data using selector: {css_selector}"):
+                            extraction_result = st.session_state.web_automation.extract_by_css_selector(css_selector)
+                            if "error" not in extraction_result:
+                                st.success(f"Found {extraction_result.get('count', 0)} matching elements!")
+                                
+                                # Display results
+                                for i, item in enumerate(extraction_result.get('results', [])):
+                                    with st.expander(f"Element {i+1} ({item.get('tag_name', 'unknown')})"):
+                                        # Display extracted text
+                                        st.markdown("**Text Content:**")
+                                        st.text(item.get('text', 'No text content'))
+                                        
+                                        # Display attributes
+                                        st.markdown("**Attributes:**")
+                                        for attr, value in item.get('attributes', {}).items():
+                                            st.text(f"{attr}: {value}")
+                                        
+                                        # Display HTML
+                                        with st.expander("Raw HTML"):
+                                            st.code(item.get('html', ''), language='html')
+                            
+                                # Download data as JSON
+                                if extraction_result.get('count', 0) > 0:
+                                    json_data = json.dumps(extraction_result.get('results', []), indent=2)
+                                    st.download_button(
+                                        "Download as JSON",
+                                        data=json_data,
+                                        file_name="extracted_data.json",
+                                        mime="application/json"
+                                    )
+                            else:
+                                st.error(f"Error extracting data: {extraction_result['error']}")
+                    else:
+                        st.warning("Please enter both URL and CSS selector!")
 else:
     st.info("Please login or sign up to start chatting with the AI Agent.")

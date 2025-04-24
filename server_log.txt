@@ -1,0 +1,9 @@
+USER_AGENT environment variable not set, consider setting it to identify your requests.
+INFO:     Will watch for changes in these directories: ['D:\\AgenticAI\\Seminar']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [8720] using StatReload
+USER_AGENT environment variable not set, consider setting it to identify your requests.
+INFO:     Started server process [9140]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api\auth.py'. Reloading...
