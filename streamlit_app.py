@@ -156,7 +156,7 @@ def get_mock_code_analysis(code, language, task_type):
     if task_type == "Code Analysis":
         # Format the analysis without f-strings containing code
         analysis_header = "## Code Analysis for " + language
-        code_block = "```" + language + "\n" + code + "\n```"
+        code_block = "" + language + "\n" + code + "\n"
         structure_section = """
 ### Structure and Organization
 - The code appears to be """ + str(len(code.split('\n'))) + """ lines long
@@ -231,7 +231,7 @@ print(processed)
             
         # Build the response without f-strings containing code
         header = "## Generated " + language + " Code"
-        code_block = "```" + language + "\n" + code_example + "\n```"
+        code_block = "" + language + "\n" + code_example + "\n"
         footer = "This is a demonstration of code generation. In the full application, this would be customized to your specific requirements."
         
         return header + "\n\n" + code_block + "\n\n" + footer
