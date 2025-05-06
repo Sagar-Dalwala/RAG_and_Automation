@@ -654,49 +654,145 @@ class AdvancedWebScraper:
             return {"error": f"Error analyzing content: {str(e)}"}
     
     def extract_contact_info(self):
-        """Extract contact information from the page"""
+        """Extract contact information from the current page"""
         try:
-            # Get page source
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            text = soup.get_text(' ', strip=True)
-            
-            # Regular expressions for different contact types
-            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-            phone_pattern = r'\b(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b'
-            address_pattern = r'\d+\s+[A-Za-z0-9\s.,]+\b(?:Road|Rd|Street|St|Avenue|Ave|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Plaza|Plz|Terrace|Ter|Way)\b'
-            
-            # Find all matches
-            emails = re.findall(email_pattern, text)
-            phones = re.findall(phone_pattern, text)
-            addresses = re.findall(address_pattern, text)
-            
-            # Look for social media links
-            social_media = []
-            social_platforms = {
-                'facebook.com': 'Facebook',
-                'twitter.com': 'Twitter',
-                'linkedin.com': 'LinkedIn',
-                'instagram.com': 'Instagram',
-                'youtube.com': 'YouTube',
-                'github.com': 'GitHub',
-                'tiktok.com': 'TikTok'
+            contact_info = {
+                "emails": [],
+                "phones": [],
+                "addresses": [],
+                "social_media": []
             }
             
-            for link in soup.find_all('a', href=True):
-                href = link.get('href', '').lower()
-                for platform_url, platform_name in social_platforms.items():
-                    if platform_url in href:
-                        social_media.append({
-                            'platform': platform_name,
-                            'url': href
-                        })
+            # Extract emails using regex
+            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            emails = re.findall(email_pattern, self.driver.page_source)
+            contact_info["emails"] = list(set(emails))
             
-            return {
-                "success": True,
-                "emails": list(set(emails)),
-                "phones": list(set(phones)),
-                "addresses": list(set(addresses)),
-                "social_media": social_media
+            # Extract phone numbers
+            phone_pattern = r'(\+\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}'
+            phones = re.findall(phone_pattern, self.driver.page_source)
+            contact_info["phones"] = [''.join(p) for p in phones if ''.join(p).strip()]
+            
+            # Extract addresses (simplified approach)
+            address_elements = soup.find_all(['address', 'p', 'div'], class_=lambda c: c and any(term in c.lower() for term in ['address', 'location', 'contact']))
+            for element in address_elements:
+                text = element.get_text(strip=True)
+                if len(text) > 10 and any(term in text.lower() for term in ['street', 'avenue', 'road', 'blvd', 'drive']):
+                    contact_info["addresses"].append(text)
+            
+            # Extract social media links
+            social_patterns = {
+                'facebook': r'facebook\.com/[\w\.-]+',
+                'twitter': r'twitter\.com/[\w\.-]+',
+                'instagram': r'instagram\.com/[\w\.-]+',
+                'linkedin': r'linkedin\.com/[\w\.-]+',
+                'youtube': r'youtube\.com/[\w\.-]+',
+                'github': r'github\.com/[\w\.-]+'
             }
+            
+            for platform, pattern in social_patterns.items():
+                matches = re.findall(pattern, self.driver.page_source)
+                for match in matches:
+                    url = match
+                    if not url.startswith(('http://', 'https://')):
+                        url = 'https://' + url
+                    contact_info["social_media"].append({
+                        "platform": platform,
+                        "url": url
+                    })
+            
+            return contact_info
         except Exception as e:
             return {"error": f"Error extracting contact info: {str(e)}"}
+            
+    def extract_images(self, min_width=100, min_height=100, formats=None, exclude_icons=True):
+        """
+        Extract all images from the current page with advanced filtering options
+        
+        Args:
+            min_width (int): Minimum width of images to include (pixels)
+            min_height (int): Minimum height of images to include (pixels)
+            formats (list): List of image formats to include (e.g., ['jpg', 'png'])
+            exclude_icons (bool): Whether to exclude small icon images
+            
+        Returns:
+            dict: Dictionary containing extracted images
+        """
+        try:
+            if not self.driver:
+                return {"error": "Browser not started"}
+                
+            if not formats:
+                formats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']
+                
+            # Use a simpler approach with BeautifulSoup
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            
+            # Find all img tags
+            img_tags = soup.find_all('img', src=True)
+            
+            filtered_images = []
+            for img in img_tags:
+                src = img.get('src', '')
+                
+                # Process relative URLs
+                if src and not src.startswith(('http://', 'https://', 'data:')):
+                    src = urljoin(self.current_url, src)
+                    
+                # Check image format from extension
+                img_format = src.split('.')[-1].lower() if '.' in src else ''
+                if formats and img_format not in formats:
+                    continue
+                
+                # Get dimensions from attributes if available
+                width = img.get('width')
+                height = img.get('height')
+                
+                # Convert to integers if they're strings
+                try:
+                    width = int(width) if width else 0
+                    height = int(height) if height else 0
+                except ValueError:
+                    width = 0
+                    height = 0
+                
+                # Skip icons if requested
+                if exclude_icons and width > 0 and height > 0 and width < 50 and height < 50:
+                    continue
+                    
+                # Skip images smaller than minimum dimensions if we know the size
+                if width > 0 and height > 0 and (width < min_width or height < min_height):
+                    continue
+                
+                # Create image data
+                image_data = {
+                    'src': src,
+                    'alt': img.get('alt', ''),
+                    'title': img.get('title', ''),
+                    'width': width or "Unknown",
+                    'height': height or "Unknown"
+                }
+                
+                filtered_images.append(image_data)
+            
+            # Also find CSS background images for divs
+            if soup.find_all('style'):
+                # This requires more complex parsing and is less reliable
+                # For this emergency fix, we'll skip to keep it simple
+                pass
+            
+            return {
+                "count": len(filtered_images),
+                "images": filtered_images,
+                "filters": {
+                    "min_width": min_width,
+                    "min_height": min_height,
+                    "formats": formats,
+                    "exclude_icons": exclude_icons
+                }
+            }
+        except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            return {"error": f"Error extracting images: {str(e)}", "details": error_detail}

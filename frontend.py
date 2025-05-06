@@ -416,8 +416,7 @@ if st.session_state.user_id is not None:
                                                 for i, img in enumerate(content['images'][:9]):
                                                     with image_grid[i % 3]:
                                                         if img['src'].startswith(('http://', 'https://')):
-                                                            st.image(img['src'], width=150, 
-                                                                   caption=img['alt'] or "Image")
+                                                            st.image(img['src'], use_container_width=True)
                                                             st.text(f"Source: {img['src'][:30]}...")
                                         else:
                                             st.error(f"Error extracting content: {content['error']}")
@@ -658,28 +657,37 @@ if st.session_state.user_id is not None:
                 
                 extract_url = st.text_input("Enter URL", placeholder="https://example.com", key="extract_url")
                 
-                # CSS selector input
-                css_selector = st.text_input(
-                    "Enter CSS Selector", 
-                    placeholder="article .content, #main-content, .product-card",
-                    help="Examples: 'h1' (all h1 headers), '.product' (elements with 'product' class), '#main' (element with 'main' id)"
-                )
-                
                 # Common selector templates
                 st.write("Common selector templates:")
                 selector_cols = st.columns(4)
                 with selector_cols[0]:
                     if st.button("Main Content"):
-                        css_selector = "main, #content, .content, article"
+                        st.session_state.css_selector_value = "main, #content, .content, article"
+                        st.rerun()
                 with selector_cols[1]:
                     if st.button("Headlines"):
-                        css_selector = "h1, h2, h3"
+                        st.session_state.css_selector_value = "h1, h2, h3"
+                        st.rerun()
                 with selector_cols[2]:
                     if st.button("All Links"):
-                        css_selector = "a[href]"
+                        st.session_state.css_selector_value = "a[href]"
+                        st.rerun()
                 with selector_cols[3]:
                     if st.button("All Images"):
-                        css_selector = "img[src]"
+                        st.session_state.css_selector_value = "img[src]"
+                        st.rerun()
+                
+                # Initialize the css_selector_value in session state if not present
+                if 'css_selector_value' not in st.session_state:
+                    st.session_state.css_selector_value = ""
+                
+                # Use the session state value in the text input
+                css_selector = st.text_input(
+                    "Enter CSS Selector", 
+                    value=st.session_state.css_selector_value,
+                    placeholder="article .content, #main-content, .product-card",
+                    help="Examples: 'h1' (all h1 headers), '.product' (elements with 'product' class), '#main' (element with 'main' id)"
+                )
                 
                 if st.button("Extract Data"):
                     if extract_url and css_selector:
@@ -710,7 +718,9 @@ if st.session_state.user_id is not None:
                                             st.text(f"{attr}: {value}")
                                         
                                         # Display HTML
-                                        with st.expander("Raw HTML"):
+                                        st.markdown("**Raw HTML:**")
+                                        show_html = st.checkbox(f"Show HTML for Element {i+1}", key=f"show_html_{i}")
+                                        if show_html:
                                             st.code(item.get('html', ''), language='html')
                             
                                 # Download data as JSON
@@ -726,5 +736,69 @@ if st.session_state.user_id is not None:
                                 st.error(f"Error extracting data: {extraction_result['error']}")
                     else:
                         st.warning("Please enter both URL and CSS selector!")
+
+                # Advanced Image Extraction section
+                st.subheader("Advanced Image Extraction")
+                st.write("Find and extract all images from the page with filtering options")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    min_width = st.number_input("Minimum Width (px)", min_value=0, value=100)
+                    min_height = st.number_input("Minimum Height (px)", min_value=0, value=100)
+                with col2:
+                    image_format = st.multiselect("Image Format", ["jpg", "jpeg", "png", "gif", "webp", "svg"], default=["jpg", "png"])
+                    exclude_icons = st.checkbox("Exclude Small Icons", value=True)
+                
+                if st.button("Extract All Images"):
+                    if st.session_state.web_automation.current_url:
+                        with st.spinner("Extracting images..."):
+                            # Call the web automation method to extract images
+                            image_result = st.session_state.web_automation.extract_images(
+                                min_width=min_width,
+                                min_height=min_height,
+                                formats=image_format,
+                                exclude_icons=exclude_icons
+                            )
+                            
+                            if "error" not in image_result:
+                                st.success(f"Found {len(image_result.get('images', []))} images!")
+                                
+                                # Display images in a grid
+                                if image_result.get('images'):
+                                    # Create columns for the grid
+                                    num_cols = 3
+                                    image_grid = [st.columns(num_cols) for _ in range((len(image_result['images']) + num_cols - 1) // num_cols)]
+                                    
+                                    for i, img in enumerate(image_result['images']):
+                                        col_idx = i % num_cols
+                                        row_idx = i // num_cols
+                                        
+                                        with image_grid[row_idx][col_idx]:
+                                            st.image(img['src'], use_container_width=True)
+                                            st.write(f"Size: {img.get('width', 'Unknown')}x{img.get('height', 'Unknown')}")
+                                            
+                                            # Add download button for each image
+                                            st.markdown(f"[Download Image]({img['src']})")
+                                            
+                                            # Show image details on expander
+                                            with st.expander("Image Details"):
+                                                st.write(f"Alt Text: {img.get('alt', 'None')}")
+                                                st.write(f"Source: {img['src']}")
+                                                if img.get('title'):
+                                                    st.write(f"Title: {img['title']}")
+                                    
+                                    # Add bulk download option
+                                    st.subheader("Bulk Download")
+                                    image_urls = [img['src'] for img in image_result['images']]
+                                    st.download_button(
+                                        "Download All Image URLs",
+                                        "\n".join(image_urls),
+                                        file_name="image_urls.txt",
+                                        mime="text/plain"
+                                    )
+                            else:
+                                st.error(f"Error extracting images: {image_result['error']}")
+                    else:
+                        st.warning("Please load a page first!")
 else:
     st.info("Please login or sign up to start chatting with the AI Agent.")
