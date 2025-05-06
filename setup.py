@@ -59,7 +59,7 @@ def setup_environment():
     # Configuration values
     config_values = {
         "API_HOST": "127.0.0.1",
-        "API_PORT": "8000",
+        "PORT": "8000",
         "REACT_APP_API_URL": "http://127.0.0.1:8000"
     }
     
